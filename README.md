@@ -1,1 +1,1 @@
-# Open_data_R_with_Shiny
+Do it! 공공데이터로 배우는 R데이터분석 with 샤이니 교재 내용을 토대로 작성한 코드이며 이해하기 쉽게끔 설명과 함께 작성한 것이다(for me)

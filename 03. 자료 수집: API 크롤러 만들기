@@ -16,7 +16,7 @@ datelist <- seq(from = as.Date('2021-01-01'), #2021년을 12개월로 구분
 datelist <- format(datelist, format = '%Y%m') #format()은 숫자, 날짜, 문자열 등의 출력 형식을 조정할 때 사용하는 함수 / YYYY-MM-DD를 YYYYMM 형식으로 변환
 
 #4단계: 인증키 입력하기
-service_key <- "inDGnpEIXx2RB1j6t0qW9A2DF0hXFbfw%2F%2BDBMdy2NteEHgan1Ftm469yVLTE%2FLkPMC57JGpJNxJHmvaYWMO5PA%3D%3D"
+service_key <- "inDGnpEIXx2RB1j6t0qW9A2DF0hXFbfw%(...생략...)2FLkPMC57JGpJNxJHmvaYWMO5PA%3D%3D"
 
 
 
@@ -30,7 +30,7 @@ cnt <- 0
 for (i in 1:nrow(loc)) { #25개 자치구 외부 반복
   for (j in 1:length(datelist)) { #12개월 내부 반복
     cnt <- cnt + 1
-    url_list[cnt] <- paste0("https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade?", #서비스URL
+    url_list[cnt] <- paste0("https://apis.data.go.kr/(...생략...)/getRTMSDataSvcAptTrade?", #서비스URL
                             "LAWD_CD=", loc[i,1], #지역코드
                             "&DEAL_YMD=", datelist[j], #수집 월
                             "&numOfRows=", 100, #한 번에 가져올 최대 자료 수

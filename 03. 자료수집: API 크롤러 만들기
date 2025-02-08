@@ -1,0 +1,103 @@
+#3-1 크롤링 준비 (*크롤링: 웹사이트에서 자도응로 데이터를 수집하는 기술)
+
+#1단계: 작업폴더 설정
+install.packages("rstudioapi") #rstudioapi는 현재 파일 경로 가져오기, 파일 열기, 스크립트 실행 등의 작업을 자동화를 가능케 함
+setwd(dirname(rstudioapi::getSourceEditorContext()$path)) #setwd()는 괄호 안에 위치를 작업 폴더로 설정 / 괄호 안 내용은 파일 전체 경로에서 폴더 경로만 추출
+getwd() #getwd()는 설정된 작업 위치를 추출
+
+#2단계: 수집 대상 지역 설정하기
+loc <- read.csv("./01_code/sigun_code/sigun_code.csv", fileEncoding="UTF-8") #지역 코드 불러오기 (25개 자치구)
+loc$code <- as.character(loc$code) #행정구역명을 문자 변환
+
+#3단계: 수집 기간 설정하기
+datelist <- seq(from = as.Date('2021-01-01'), #2021년을 12개월로 구분
+                to = as.Date('2021-12-31'),
+                by = '1 month')
+datelist <- format(datelist, format = '%Y%m') #format()은 숫자, 날짜, 문자열 등의 출력 형식을 조정할 때 사용하는 함수 / YYYY-MM-DD를 YYYYMM 형식으로 변환
+
+#4단계: 인증키 입력하기
+service_key <- "inDGnpEIXx2RB1j6t0qW9A2DF0hX(...생략...)57JGpJNxJHmvaYWMO5PA%3D%3D"
+
+
+
+#3-2 요청 목록 생성: 자료를 어떻게 요청할까? - API에 자료를 요청하기
+
+#1단계: 요청 목록 만들기
+url_list <- list()
+cnt <- 0
+
+#2단계: 요청 목록 채우기
+for (i in 1:nrow(loc)) { #25개 자치구 외부 반복
+  for (j in 1:length(datelist)) { #12개월 내부 반복
+    cnt <- cnt + 1
+    url_list[cnt] <- paste0("https://apis.data.go.kr/1613(...생략...)TMSDataSvcAptTrade?", #서비스URL
+                            "LAWD_CD=", loc[i,1], #지역코드
+                            "&DEAL_YMD=", datelist[j], #수집 월
+                            "&numOfRows=", 100, #한 번에 가져올 최대 자료 수
+                            "&serviceKey=", service_key) #인증키
+  }
+  Sys.sleep(0.1) #딜레이 0.1초
+  msg <- paste0("[", i, "/", nrow(loc), "] ", loc[i,3], "의 크롤링 목록이 생성됨 => 총 [", cnt,"] 건") #알림 메시지
+  cat(msg, "\n\n") #띄어쓰기
+}
+
+length(url_list)
+browseURL(paste0(url_list[1])) #웹 블라우저 실행
+
+
+
+#3-3 크롤러 제작: 자동으로 자료 수집하기
+
+#1단계: 임시 저장 리스트 만들기
+#크롤링에 필요한 라이브러리 불러오기
+library(XML)
+library(data.table)
+library(stringr)
+
+raw_data <- list()
+root_Nood <- list()
+total <- list()
+dir.create("02_raw_data")
+
+#2단계: 자료 요청하고 응답받기
+for(i in 1:1) {
+  raw_data[[i]] <- xmlTreeParse(url_list[i], useInternalNodes = TRUE, encoding = "utf-8") #요청 URL을 xmlTreeParse()로 보내고 안의 내용물을 저장 / useInnternalNodes는 내부노드 구조를 유지
+  root_Node[[i]] <- xmlRoot(raw_data[[i]]) #내용물 중 XML의 루트 노드 이하를 추출해 저장
+  raw_data[[1]] <- xmlTreeParse(url_list[1], useInternalNodes = TRUE, encoding = "utf-8") #요청 URL을 xmlTreeParse()로 보내고 안의 내용물을 저장 / useInnternalNodes는 내부노드 구조를 유지
+  root_Node[[1]] <- xmlRoot(raw_data[[1]]) #내용물 중 XML의 루트 노드 이하를 추출해 저장
+  raw_data[[i]] <- xmlTreeParse(url_list[i], useInternalNodes = TRUE, encoding = "utf-8")
+  root_Node[[i]] <- xmlRoot(raw_data[[i]])
+
+#3단계: 전체 거래 건수 확인하기
+  items <- root_Node[[i]][[2]][['items']] #전체 거래 내역(item) 추출
+  size <- xmlSize(items) #전체 거래 건수 확인
+  
+#4단계: 개별 거래 내역 추출하기
+  item <- list()
+  item_temp_dt <- data.table()
+  Sys.sleep(.1)
+  
+  for(m in 1:size) {
+    item_temp <- xmlSApply(items[[m]], xmlValue) #xmlSApply()는 XML 노드에 함수를 적용하는 함수, xmlValue는 텍스트 값을 추출하는 함수
+    item_temp_dt <- data.table(year = item_temp[10],
+                               month = item_temp[9],
+                                 day = item_temp[8],
+                                 price = item_temp[7],
+                                 code = item_temp[18],
+                                 dong_nm = item_temp[17],
+                                 jibun = item_temp[15],
+                               con_year = item_temp[3],
+                               apt_nm = item_temp[2],
+                               area = item_temp[13],
+                               floor = item_temp[14])
+    item[[m]] <- item_temp_dt } #분리된 거래 내역을 순서대로 저장
+  apt_bind <- rbindlist(item) #리스트를 데이터프레임으로 변환 및 통합 저장
+  
+#5단계: 응답 내역 저장하기
+  region_nm <- subset(loc, code == str_sub(url_list[i],84,88))$addr_1
+  month <- str_sub(url_list[i],99,104)
+  path <- as.character(paste0("./02_raw_data/", region_nm, "_", month, ".csv"))
+  write.csv(apt_bind, path) #CSV 파일로 저장
+  mdg <- paste0("[", i, "/", length(url_list), "] 수집한 데이터를 [", path, "]에 저장 합니다.") #알림 메시지
+  cat(msg, "\n\n")
+}

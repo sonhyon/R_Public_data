@@ -109,6 +109,6 @@ library(plyr)
 apt_price <- ldply(as.list(paste0("./02_raw_data/", files)), 
                    function(file) {read.csv(file, fileEncoding = "CP949")}) #ldply()는 리스트의 각 요소에 함수 적용 후 데이터 프레임으로 변환
 
-dir.create("./03_intergrated") #새로운 폴더 생성
-save(apt_price, file="./03_intergrated/03_apt_price.rdata") #rdata로 저장
-write.csv(apt_price, "./03_intergrated/03_apt_price.csv") #csv로 저장
+dir.create("./03_integrated") #새로운 폴더 생성
+save(apt_price, file="./03_integrated/03_apt_price.rdata") #rdata로 저장
+write.csv(apt_price, "./03_integrated/03_apt_price.csv") #csv로 저장

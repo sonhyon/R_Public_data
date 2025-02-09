@@ -1,0 +1,36 @@
+#4-1 불필요한 정보 지우기
+
+#1단계: 수집한 데이터 불러오기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+getwd()
+options(warn=-1) #중요도가 떨어지는 경고 메시지를 무시
+
+load("./03_integrated/03_apt_price.rdata") #실거래 자료 불러오기
+
+#2단계: 결측값과 공백 제거하기
+table(is.na(apt_price)) #결측값 확인
+
+apt_price <- na.omit(apt_price) #결측값 제거
+table(is.na(apt_price))
+
+head(apt_price$price, 2) #공백 확인
+
+library(stringr) #stringr 패키지에서 문자열 데이터의 공백을 제거
+apt_price <- as.data.frame(apply(apt_price, 2, str_trim)) #apply()로 전체 데이터프레임을 대상을 하고, 열을 기준으로 str_trim으로 공백을 제거
+
+
+
+#4-2 항목별 데이터 다듬기
+
+#1단계: 매매 연월일 만들기
+library(lubridate)
+library(dplyr)
+apt_price <- apt_price %>% mutate(ymd=make_date(year, month, day)) #mutate()는 데이터 프레임에 새로운 변수를 추가 및 변경 / make_date()로 연월일 결합
+apt_price$ym <- floor_date(apt_price$ymd, "month") #연월 생성 / floor_date()로 날짜형식으로 만들기
+head(apt_price, 2)
+
+#2단계: 매매가 변환하기
+head(apt_price$price, 3) #문자형인 가격 확인
+
+apt_price$price <- apt_price$price %>% sub(",","",.) %>% as.numeric() #sub()로 쉼표를 빈문자열로 바꿈, dot은 %>%로 전달된 apt_price$price를 의미 / as.numeric()은 문자열을 숫자로 바꿈
+head(apt_price$price, 3)

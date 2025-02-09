@@ -97,3 +97,18 @@ for(i in 1:length(url_list)) {
   msg <- paste0("[", i, "/", length(url_list), "] 수집한 데이터를 [", path, "]에 저장 합니다.") #알림 메시지
   cat(msg, "\n\n")
 }
+
+
+
+#3-4 자료 정리: 자료 통합하기
+
+#1단계: CSV 팡리 통합하기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path)) #작업 폴더 설정
+files <- dir("./02_raw_data") #현재 작업 디렉토리의 폴더 목록 조회
+library(plyr)
+apt_price <- ldply(as.list(paste0("./02_raw_data/", files)), 
+                   function(file) {read.csv(file, fileEncoding = "CP949")}) #ldply()는 리스트의 각 요소에 함수 적용 후 데이터 프레임으로 변환
+
+dir.create("./03_intergrated") #새로운 폴더 생성
+save(apt_price, file="./03_intergrated/03_apt_price.rdata") #rdata로 저장
+write.csv(apt_price, "./03_intergrated/03_apt_price.csv") #csv로 저장

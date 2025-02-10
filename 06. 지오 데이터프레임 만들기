@@ -1,0 +1,39 @@
+#6-1 좌표계와 지오 데이터 포맷
+
+
+
+#6-2 주소와 좌표 결합하기
+
+#1단계: 데이터 불러오기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+getwd()
+load("./04_pre_process/04_pre_process.rdata")
+load("./05_geocoding/05_juso_geocoding.rdata")
+
+#2단계: 주소와 좌표 결합하기
+library(dplyr)
+apt_price <- left_join(apt_price, juso_geocoding, by=c("juso_jibun" = "apt_juso")) #apt_price의 juso_jibun과 juso_geocoding의 apt_juso를 기준으로 결합
+apt_price <- na.omit(apt_price) #결측값 제거
+
+
+
+#6-3 지오 데이터프레임 만들기
+
+#1단계: 지오 데이터프레임 생성하기
+library(sp)
+coordinates(apt_price) <- ~coord_x + coord_y #x와 y의 공간좌표를 할당
+proj4string(apt_price) <- "+proj=longlat +datum=WGS84 +no_defs" #해당 공간좌표가 어떤 좌표계를 참조하는지 정의(여기선 WGS84 좌표계를 사용)
+library(sf)
+apt_price <- st_as_sf(apt_price) #특정 부분을 추출, 삭제, 변형할 수 있게 sf형으로 변환
+
+#2단계: 지오 데이터프레임 시각화
+plot(apt_price$geometry, axes = T, pch = 1) #공간좌표로 플롯 그리기
+library(leaflet) #지도 그리기 라이브러리
+leaflet() %>% 
+  addTiles() %>% #지도 추가
+  addCircleMarkers(data=apt_price[1:1000,], label=~apt_nm) #원 디자인
+
+#3단계: 지오 데이터프레임 저장하기
+dir.create("06_geodataframe")
+save(apt_price, file="./06_geodataframe/06_apt_price.rdata")
+write.csv(apt_price, "./06_geodataframe/06_apt_price.csv")

@@ -34,3 +34,51 @@ head(apt_price$price, 3) #문자형인 가격 확인
 
 apt_price$price <- apt_price$price %>% sub(",","",.) %>% as.numeric() #sub()로 쉼표를 빈문자열로 바꿈, dot은 %>%로 전달된 apt_price$price를 의미 / as.numeric()은 문자열을 숫자로 바꿈
 head(apt_price$price, 3)
+
+#3단계: 주소 조합하기
+head(apt_price$apt_nm, 30)
+
+apt_price$apt_nm <- gsub("\\(.*","",apt_price$apt_nm) #괄호 이후 문자열을 공백으로 변환
+head(apt_price$apt_nm)
+
+loc <- read.csv("./01_code/sigun_code/sigun_code.csv", fileEncoding="UTF-8")
+
+apt_price <- merge(apt_price, loc, by='code') #지역명을 기준으로 apt_price와 loc를 결합하기
+apt_price$juso_jibun <- paste0(apt_price$addr_2, " ",apt_price$dong, " ", apt_price$jibun, " ",apt_price$apt_nm)
+
+#4단계: 건축 연도, 전용면적 변환하기
+head(apt_price$con_year, 3)
+head(apt_price$area, 3)
+
+apt_price$con_year <- apt_price$con_year %>% as.numeric() #건축연도를 숫자형으로 변환
+apt_price$area <- apt_price$area %>% as.numeric() #전용면적을 숫자형으로 변환
+head(apt_price$con_year, 3)
+head(apt_price$area, 3)
+
+#5단계: 평당 매매가 만들기
+apt_price$py <- round(((apt_price$price/apt_price$area)*3.3), 0) #평당가격 만들기
+head(apt_price$py, 3)
+
+#6단계: 층수 변환하기
+min(apt_price$floor)
+
+apt_price$floor <- apt_price$floor %>% as.numeric() %>% abs() #층수를 절대값으로 변환
+min(apt_price$floor)
+
+apt_price$cnt <- 1 #모든 거래 건수에 1이라는 숫자를 부여
+head(apt_price, 2)
+
+
+
+#4-3 전처리 데이터 저장하기
+
+#1단계: 필요한 칼럼만 추출하기
+apt_price <- apt_price %>% select(ymd, ym, year, code, addr_1, apt_nm, juso_jibun, price, con_year, area, floor, py, cnt) #칼럼 추출
+head(apt_price)
+
+#2단계: 전처리 데이터 저장하기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+getwd()
+dir.create("./04_pre_process")
+save(apt_price, file='./04_pre_process/04_pre_process.rdata') #rdata로 저장
+write.csv(apt_price, "./04_pre_process/04_pre_process.csv") #csv로 저장

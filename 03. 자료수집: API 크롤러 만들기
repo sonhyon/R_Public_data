@@ -90,7 +90,7 @@ for(i in 1:length(url_list)) {
   apt_bind <- rbindlist(item) #리스트를 데이터프레임으로 변환 및 통합 저장
   
 #5단계: 응답 내역 저장하기
-  region_nm <- subset(loc, code == str_sub(url_list[1],83,87))$addr_1
+  region_nm <- subset(loc, code == str_sub(url_list[i],83,87))$addr_1
   month <- str_sub(url_list[i],98,103)
   path <- as.character(paste0("./02_raw_data/", region_nm, "_", month, ".csv"))
   write.csv(apt_bind, path, fileEncoding = "CP949") #CSV 파일로 저장

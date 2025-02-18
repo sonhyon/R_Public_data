@@ -74,3 +74,128 @@ rm(list = ls()) #메모리 정리
 
 
 #7-2 요즘 뜨는 지역은 어디일까?
+
+#1단계: 데이터 준비하기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+load("./06_geodataframe/06_apt_price.rdata") #RData (또는 RDA) 파일을 불러오는 함수
+grid <- st_read("./01_code/sigun_grid/seoul.shp") #sf패키지에서 제공하는 함수로, 공간 데이터를 읽어오는 역할을 한다
+apt_price <- st_join(apt_price, grid, join = st_intersects) #sf패키지에서 공간 데이터를 조인할 때 사용하는 함수 / st_intersects를 기준으로 조인
+head(apt_price)
+
+#2단계: 이전/이후 데이터 세트 만들기
+kde_before <- subset(apt_price, ymd < "2021-07-01")
+kde_before <- aggregate(kde_before$py, by=list(kde_before$ID), mean) #kde_before데이터에서 ID를 기준으로 py의 평균을 계산
+colnames(kde_before) <- c("ID", "before")
+
+kde_after <- subset(apt_price, ymd > "2021-07-01")
+kde_after <- aggregate(kde_after$py, by=list(kde_after$ID), mean)
+colnames(kde_after) <- c("ID", "after")
+
+kde_diff <- merge(kde_before, kde_after, by="ID")
+kde_diff$diff <- round((((kde_diff$after - kde_diff$before) /
+                           kde_diff$before) * 100), 0) #변화율 계산
+head(kde_diff)
+
+#3단계: 가격이 오른 지역 찾기
+library(sf)
+kde_diff <- kde_diff[kde_diff$diff > 0,] #상승 지역만 추출
+kde_hot <- merge(grid, kde_diff, by="ID") #그리드에 상승 지역 결합
+library(ggplot2)
+library(dplyr)
+kde_hot %>%
+  ggplot(aes(fill = diff)) + #diff 값에 따라 색상이 변하도록 설정
+  geom_sf() + #공간 데이터가 지도처럼 시각화됨
+  scale_fill_gradient(low = "white", high = "red")
+
+#4단계: 지도경계선 그리기
+library(sp)  
+kde_hot_sp <- as(st_geometry(kde_hot), "Spatial") # sf형 => sp형 변환
+x <- coordinates(kde_hot_sp)[,1]  # 그리드 x, y 좌표 추출
+y <- coordinates(kde_hot_sp)[,2] 
+
+l1 <- bbox(kde_hot_sp)[1,1] - (bbox(kde_hot_sp)[1,1]*0.0001) # 그리드 기준 경계지점 설정
+l2 <- bbox(kde_hot_sp)[1,2] + (bbox(kde_hot_sp)[1,2]*0.0001)
+l3 <- bbox(kde_hot_sp)[2,1] - (bbox(kde_hot_sp)[2,1]*0.0001)
+l4 <- bbox(kde_hot_sp)[2,2] + (bbox(kde_hot_sp)[1,1]*0.0001)
+
+library(spatstat)  # install.packages("spatstat")
+win <- owin(xrange=c(l1,l2), yrange=c(l3,l4))  # 경계지점 기준 외곽선 만들기(bounding-box)
+plot(win)                                      # 확인
+rm(list = c("kde_hot_sp", "apt_price", "l1", "l2", "l3", "l4")) # 메모리 정리
+
+#5단계: 밀도 그래프 변환하기
+p <- ppp(x, y, window=win, marks=kde_hot$diff) # 경계창 위에 좌표값 포인트 생성
+d <- density.ppp(p, weights=kde_hot$diff,      # 포인트를 커널밀도 함수로 변환
+                 sigma = bw.diggle(p), 
+                 kernel = 'gaussian')
+plot(d)   # 확인
+rm(list = c("x", "y", "win","p")) # 변수 정리
+
+#6단계: 픽셀 -> 레스터 변환
+d[d < quantile(d)[4] + (quantile(d)[4]*0.1)] <- NA  # 노이즈 제거
+library(raster)         # install.packages("raster")
+raster_hot <- raster(d) # 레스터 변환
+plot(raster_hot) #  확인
+
+#7단계: 클리핑
+bnd <- st_read("./01_code/sigun_bnd/seoul.shp") # 서울시 경계선 불러오기
+raster_hot <- crop(raster_hot, extent(bnd))            # 외곽선 클리핑
+crs(raster_hot) <- sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84  
+                        +towgs84=0,0,0")  # 좌표계 정의
+plot(raster_hot)   #  확인
+plot(bnd, col=NA, border = "red", add=TRUE)
+
+#8단계: 지도 그리기
+library(leaflet)
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>% #기본 지도 불러오기
+  addPolygons(data = bnd, weight = 3, color="red", fill = NA) %>% #서울시 경계선 불러오기
+  addRasterImage(raster_hot, #래스터 이미지 불러오기
+                 colors = colorNumeric(c("blue", "green", "yellow", "red"),
+                                       values(raster_hot), na.color = "transparent"), opacity = 0.4)
+
+#9단계: 평균 가격 변화율 정보 저장하기
+save(raster_hot, file="./07_map/07_kde_hot.rdata")
+rm(list = ls())
+
+
+
+#7-3 우리 동네가 옆 동네보다 비쌀까?
+
+#1단계: 데이터 준비하기
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+load("./06_geodataframe/06_apt_price.rdata") #실거래 자료 불러오기
+load("./07_map/07_kde_high.rdata") #최고가 래스터 이미지 불러오기
+load("./07_map/07_kde_hot.rdata") #급등지 래스터 이미지 불러오기
+
+library(sf)
+bnd <- st_read("./01_code/sigun_bnd/seoul.shp") #서울시 경계선
+grid <- st_read("./01_code/sigun_grid/seoul.shp") #서울시 그리드 파일
+
+#2단계: 마커 클러스트링 옵션 설정하기
+pcnt_10 <- as.numeric(quantile(apt_price$py, probs=seq(.1, .9, by=.1))[1]) #이상치 설정 / 하위 10%
+pcnt_90 <- as.numeric(quantile(apt_price$py, probs=seq(.1, .9, by=.1))[9]) #상위 10%
+
+load("./01_code/circle_marker/circle_marker.rdata") #마커 클러스터링 함수 등록
+
+circle.colors <- sample(x=c("red", "green", "blue"), size=1000, replace=TRUE) #마커 클러스터링 색상 설정: 상, 중, 하
+
+#3단계: 마커 클러스터링 시각화하기
+library(purrr)
+leaflet() %>% #leaflet()은 대화형 지도를 만들 때 사용하는 함수
+  addTiles() %>% #배경 지도를 추가하는 함수
+  addPolygons(data=bnd, weight=3, color="red", fill=NA) %>% #경계선 불러오기
+  addRasterImage(raster_high, #최고가 래스터 이미지 불러오기
+                 colors=colorNumeric(c("blue", "green", "yellow", "red"), values(raster_high),
+                                     na.color="transparent"), opacity = 0.4, group="2021 최고가") %>%
+  addRasterImage(raster_hot, #급등지 래스터 이미지 불러오기
+                 colors = colorNumeric(c("blue", "green", "yellow", "red"), values(raster_hot),
+                                       na.color="transparent"), opacity = 0.4, group="2021 급등지") %>%
+  addLayersControl(baseGroups = c("2021 최고가", "2021 급등지"), #최고가/급등지 선택 옵션 추가하기
+                   options = layersControlOptions(collapsed = FALSE)) %>%
+  addCircleMarkers(data = apt_price, lng=unlist(map(apt_price$geometry, 1)), #마커 클러스트링 불러오기
+                   lat = unlist(map(apt_price$geometry, 2)), radius=10, stroke=FALSE,
+                   fillOpacity = 0.6, fillColor = circle.colors, weight = apt_price$py,
+                   clusterOptions = markerClusterOptions(iconCreateFunction=JS(avg.formula)))
+
+rm(list = ls())

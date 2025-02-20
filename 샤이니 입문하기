@@ -1,0 +1,118 @@
+#1단계: 샤이니 기본 구조 이해하기
+library(shiny) #분석 결과를 웹 애플리케이션으로 구현할 수 있는 샤이니 패키지!
+ui <- fluidPage("사용자 인터페이스")
+server <- function(input, output, session){}
+shinyApp(ui, server)
+
+#2단계: 샘플 실행해보기
+runExample() #샤이니가 어떠한 샘플을 제공하는지 확인
+
+runExample("01_hello")
+
+#3단계: 사용자 인터페이스 부분
+ui <- fluidPage( #사용자 인터페이스 시작: fluidPage 정의 / 사용자 인터페이스=UI
+  titlePanel("샤이니 1번 샘플"), #제목 입력
+  sidebarLayout( #레이아웃 구성: 사이드바 패널 + 메인 패널 구성 /*레이아웃은 어떤 방식으로 UI를 배치할 것인지 배치하는 것
+    sidebarPanel( #사이드바 패널 시작
+      sliderInput(inputId = "bins", #입력 아이디
+                  label = "막대(bin) 개수:", #텍스트 라벨
+                  min=1, max=50, #선택 범위 구성
+                  value = 30)), #기본값 30 설정
+    mainPanel( #메인 패널 시작
+      plotOutput(outputId = "disPlot")) #차트 출력
+  ))
+
+#4단계: 서버 부분
+server <- function(input, output, session){ #server()는 input, output, session이라는 3개의 전달 인자를 정의하는 것으로 시작 / session은 독립적인 공간을 마련해줌
+  output$disPlot <- renderPlot( {#renderPlot()은 서버에서 그래프를 생성하는 함수. 즉 사용자의 입력값에 따라 동적으로 생성되는 그래프
+    x <- faithful$waiting #분출 대기 시간 정보 저장 / faithful$waiting은 기본 데이터셋 중 하나 / Shiny 예제에서 히스토그램을 그릴 때 많이 사용
+    bins <- seq(min(x), max(x), length.out=input$bins + 1) #히스토그램의 구간을 설정
+    hist(x, breaks = bins, col = "#75AADB", border = "red", #x는 데이터, breaks는 몇 개의 구간으로 나눌 지 결정
+         xlab = "다음 분출 때까지 대기 시간(분)",
+         main = "대기 시간 히스토그램")
+  })
+}
+shinyApp(ui, server)
+rm(list=ls())
+
+
+
+#9-2 입력과 출력하기
+
+#1단계: 입력받기 input$~
+library(shiny)
+ui <- fluidPage(
+  sliderInput("range", "연비", min=0, max=35, value=c(0,10))
+)
+
+server <- function(input, output, session) {}
+
+shinyApp(ui, server)
+
+#2단계: 출력하기 output$~
+library(shiny)
+ui <- fluidPage(
+  sliderInput("range", "연비", min=0, max=35, value=c(0,10)),
+  textOutput("value"))
+
+server <- function(input, output, session){
+  output$value <- renderText((input$range[1] + input$range[2]))}
+
+shinyApp(ui, server)
+
+#3단계: 렌더링 함수의 중요성 render~()
+
+
+
+#9-3 반응형 웹 애플리케이션 만들기
+
+#1단계: 데이터 준비하기
+library(DT)
+library(ggplot2)
+mpg <- mpg
+
+#2단계: 반응식 작성하기
+library(shiny)
+ui <- fluidPage(
+  sliderInput("range", "연비", min=0, max=35, value=c(0,10)),
+  DT::dataTableOutput("table"))
+
+server <- function(input, output, session) {
+  cty_sel = reactive({ #사용자 입력에 따라 반응하도록 reactive() 반응식을 사용
+    cty_sel = subset(mpg, cty >= input$range[1] & cty <= input$range[2])
+    return(cty_sel)}) #return()으로 cty_sel 반응식 결과를 저장
+  output$table <- DT::renderDataTable(cty_sel()) }
+
+shinyApp(ui, server)
+
+
+
+#9-4 레이아웃 정의하기
+
+#1단계: 단일 페이지 레이아웃
+library(shiny)
+ui <- fluidPage(
+  fluidRow(
+    column(9, div(style = "height:450px;border: 4px solid red;", "폭 9")),
+    column(3, div(style = "height:450px;border: 4px solid purple;", "폭 3")),
+    column(12, div(style = "height:400px;border: 4px solid blue;", "폭 12"))))
+
+server <- function(input, output, session) {}
+
+shinyApp(ui, server)
+
+#2단계: 탭 페이지 추가하기
+ui <- fluidPage(
+  fluidRow(
+    column(9, div(style = "height:450px;border: 4px solid red;", "폭 9")),
+    column(3, div(style = "height:450px;border: 4px solid red;", "폭 3")),
+    tabsetPanel(
+      tabPanel("탭1",
+               column(4, div(style = "height:300px;border: 4px solid red;", "폭 4")),
+               column(4, div(style = "height:300px;border: 4px solid red;", "폭 4")),
+               column(4, div(style = "height:300px;border: 4px solid red;", "폭 4")), ),
+      tabPanel("탭2", div(style="height:300px;border: 4px solid blue;", "폭 12")))))
+
+server <- function(input, output, session)
+
+shinyApp(ui, server)

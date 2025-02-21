@@ -1,23 +1,20 @@
 #10-4 서울시 아파트 실거래 애플리케이션 만들기
 
 
-# 01_Library
-
+#1단계: 라이브러리 불러오기
 library(devtools); library(sf); library(purrr); library(dplyr); library(DT) # install.packages("devtools") 
 library(lattice); library(latticeExtra); library(lubridate) # install.packages("latticeExtra") 
 library(ggplot2); library(ggfortify); library(ggrepel); library(showtext)   # install.packages("ggrepel") 
 library(leaflet); library(leaflet.extras); library(raster); library(shiny)  # install.packages("showtext")
 library(mapview); library(mapedit); library(grid)
 
-# 02_Hangul font
-
+#2단계: 한글 글꼴 설정하기
 require(showtext)
 font_add_google(name='Nanum Gothic', regular.wt=400, bold.wt=700)
 showtext_auto()
 showtext_opts(dpi=112)
 
-# 03_Data Load
-
+#3단계: 데이터 불러오기
 #setwd(dirname(rstudioapi::getSourceEditorContext()$path))  # 배포시 주석 처리 필수 
 grid <- st_read("./01_code/sigun_grid/seoul.shp") 
 bnd <- st_read("./01_code/sigun_bnd/seoul.shp")  
@@ -25,21 +22,18 @@ load("./06_geodataframe/06_apt_price.rdata")
 load("./07_map/07_kde_high.rdata")                
 load("./07_map/07_kde_hot.rdata")            
 
-# 04_Marker clustering
-
+#4단계: 마커 클러스터링 설정
 pcnt_10 <- as.numeric(quantile(apt_price$py, probs = seq(.1, .9, by = .1))[1]) 
 pcnt_90 <- as.numeric(quantile(apt_price$py, probs = seq(.1, .9, by = .1))[9]) 
 load("./01_code/circle_marker/circle_marker.rdata")                            
 circle.colors <- sample(x=c("red","green","blue"), size=1000, replace=TRUE)    
 
-# 05_Grid filtering
-
+#5단계: 그리드 필터링하기
 grid <- as(grid, "Spatial") 
 grid <- as(grid, "sfc") 
 grid <- grid[which(sapply(st_contains(st_sf(grid), apt_price), length)>0)]
 
-# 06_Shiny_UI
-
+#6단계: 사용자 화면 만들기
 ui <- fluidPage(
   #---#
   fluidRow(
@@ -60,8 +54,8 @@ ui <- fluidPage(
     tabPanel("Table", DT::dataTableOutput("table")) 
   ))
 
-# 07_Shiny_Server
-
+#7단계: 서버 만들기
+#슬라이드 범위 선택 필터링
 server <- function(input, output, session){
   #---#
   all = reactive({
@@ -70,7 +64,8 @@ server <- function(input, output, session){
                    area >= input$range_area[1] & 
                    area <= input$range_area[2])
     return(all)})
-  #---#
+  
+#지도 그리기
   g_sel <- callModule(selectMod, "selectmap",
                       leaflet() %>% 
                         addTiles(options = providerTileOptions(minZoom = 9, maxZoom = 18)) %>% 
@@ -91,7 +86,8 @@ server <- function(input, output, session){
                                          fillOpacity = 0.6, fillColor = circle.colors, weight=apt_price$py, 
                                          clusterOptions = markerClusterOptions(iconCreateFunction=JS(avg.formula))) %>% 
                         leafem::addFeatures(st_sf(grid), layerId = ~seq_len(length(grid)), color = 'grey'))
-  #---#  
+  
+#반응 결과 필터링
   rv <- reactiveValues(intersect=NULL, selectgrid=NULL)  # 반응식 초깃값 NULL
   observe({
     gs <- g_sel() 
@@ -103,7 +99,8 @@ server <- function(input, output, session){
       rv$intersect <- NULL
     }
   })
-  #---#
+  
+#회귀 분석
   output$density <- renderPlot({
     if (nrow(rv$intersect) == 0)  
       return(NULL)
@@ -123,7 +120,8 @@ server <- function(input, output, session){
     text(avg_sel + (avg_sel)*0.13, plot_high * 0.3, 
          sprintf("%.0f", avg_sel), srt=0.2, col = "red")
   })
-  #---#
+  
+#회귀분석
   output$regression <- renderPlot({
     if (nrow(rv$intersect) == 0) 
       return(NULL)
@@ -149,7 +147,8 @@ server <- function(input, output, session){
       annotation_custom(grob_1) + 
       annotation_custom(grob_2)
   })
-  #---#
+  
+#주성분 분석
   output$pca <- renderPlot({
     if (nrow(rv$intersect) == 0)  
       return(NULL)
@@ -160,7 +159,8 @@ server <- function(input, output, session){
     autoplot(m, size=NA, loadings.label=T, loadings.label.size=4)+
       geom_label_repel(aes(label=pca_01$apt_nm), size=3, alpha = 0.7, family="Nanum Gothic")
   })
-  #---#
+  
+#테이블 그리기
   output$table <- DT::renderDataTable({
     dplyr::select(rv$sel, ymd, addr_1, apt_nm, price, area, floor, py) %>% 
       arrange(desc(py))}, extensions = 'Buttons',
@@ -168,6 +168,5 @@ server <- function(input, output, session){
                    paging = TRUE, buttons = c('excel'))) 
 }
 
-# 08_Shiny_App
-
+#8단계: 애플리케이션 실행하기
 shinyApp(ui, server)

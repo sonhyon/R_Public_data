@@ -37,3 +37,54 @@ for (i in 1:nrow(loc)) {
 
 length(url_list)
 browseURL(paste0(url_list[1]))
+
+library(XML); library(data.table); library(stringr)
+
+raw_data <- list()
+root_Node <- list()
+total <- list()
+#dir.create("02_raw_data")
+
+for(i in 1:length(url_list)) {
+  raw_data[[i]] <- xmlTreeParse(url_list[i], useInternalNodes = TRUE,
+                                encoding = "utf-8")
+  root_Node[[i]] <- xmlRoot(raw_data[[i]])
+  
+  items <- root_Node[[i]][[2]][['items']]
+  size <- xmlSize(items)
+  
+  item <- list()
+  item_temp_dt <- data.table()
+  Sys.sleep(.1)
+  for(m in 1:size) {
+    item_temp <- xmlSApply(items[[m]],xmlValue)
+    item_temp_dt <- data.table(year = item_temp[10],
+                               month = item_temp[9],
+                               day = item_temp[8],
+                               price = item_temp[7],
+                               code = item_temp[18],
+                               dong_nm = item_temp[20],
+                               jibun = item_temp[15],
+                               con_year = item_temp[3],
+                               apt_nm = item_temp[2],
+                               area = item_temp[13],
+                               floor = item_temp[14])
+    item[[m]] <- item_temp_dt}                          #---# 분리된 거래내역 순서대로 저장
+  apt_bind <- rbindlist(item)                           # 통합 저장
+
+  region_nm <- subset(loc, code == regmatches(url_list[i], regexpr("(?<=LAWD_CD=)[^&]*", url_list[i], perl=TRUE)))[,4] # 지역명 추출
+  month <- gsub(".*DEAL_YMD=(\\d{6}).*", "\\1", url_list[i])                                                           # 연월(YYYYMM) 추출
+  path <- as.character(paste0("./02_raw_data/", region_nm, "_", month,".csv"))                # 저장위치 설정
+  write.csv(apt_bind, path)                                                                   # csv 저장
+  msg <- paste0("[", i,"/",length(url_list), "] 수집한 데이터를 [", path,"]에 저장 합니다.")  # 알림 메시지
+  cat(msg, "\n\n")
+}               
+
+files <- dir("./02_raw_data") #dir() 폴더 내 모든 파일명 읽기
+library(plyr)
+apt_price <- ldply(as.list(paste0("./02_raw_data/", files)), read.csv) #read.csv 함수를 적용해 ldply()로 결합
+tail(apt_price, 2)
+
+dir.create("./03_intergrated")
+save(apt_price, file="./03_intergrated/03_apt_price.rdata")
+write.csv(apt_price, "./03_intergrated/03_apt_price.csv")

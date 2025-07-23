@@ -19,6 +19,7 @@ datelist <- format(datelist, format = '%Y%m') #format()은 숫자, 날짜, 문�
 service_key <- "inDGnpEIXx2RB1j6t0qW9A2DF0hXFbfw%2F%2BDBMdy2NteEHgan1Ftm469yVLTE%2FLkPMC57JGpJNxJHmvaYWMO5PA%3D%3D"
 
 
+
 #3-2 요청 목록 생성: 자료를 어떻게 요청할까? - API에 자료를 요청하기
 
 #1단계: 요청 목록 만들기

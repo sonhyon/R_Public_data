@@ -83,7 +83,7 @@ grob_2 <- grobTree(textGrob(paste0("관심 지역: ", coef_sel, "만원(평당)"
                             gp=gpar(col="red", fontsize=16, gontface="bold")))
 
 library(ggpmisc) #ggplot2와 함께 사용하여 회귀선을 시각화할 수 있음
-gg <- ggplot(sel, aes(x=month, y=sel_py)) + #관ㅅ미 지역 회귀선 그리기
+gg <- ggplot(sel, aes(x=month, y=sel_py)) + #관심 지역 회귀선 그리기
   geom_line() + xlab("월") +ylab("가격") +
   theme(axis.text.x=element_text(angle=90)) +
   stat_smooth(method='lm', colour="dark grey", linetype="dashed") +
